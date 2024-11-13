@@ -1,9 +1,10 @@
 
 import pandas as pd
 import openpyxl
-#import numpy as np
+import numpy as np
 import os
-
+from collections import Counter
+import math
 def reverse_complement(sequence):
     # Define complement mapping
     complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
@@ -245,11 +246,11 @@ print(motifs_to_avoid)
 algorithm = None
 while algorithm is None:
     try:
-        algorithm = int(input("Please choose an optimization algorithm.\n 1 - Most Frequent\n 2 - Frequency Distribution\n"))
+        algorithm = int(input("Please choose an optimization algorithm.\n 1 - Most Frequent\n 2 - Probability Frequency Distribution\n 3 - Enforced Frequency Distribution\n"))
     except ValueError:
         print("please provide a valid option")
         continue
-    if algorithm != 1 and algorithm != 2:
+    if algorithm != 1 and algorithm != 2 and algorithm !=3:
         print("please provide a valid option")
         algorithm = None
     else:
@@ -257,6 +258,74 @@ while algorithm is None:
         break
         
 # most frequent algorithm
+if algorithm == 1:
+    # Step 1: Find the most frequent codon for each amino acid
+    most_frequent_codons = (
+        codon_df.loc[codon_df.groupby('Amino')['Frequency'].idxmax()]
+        .set_index('Amino')['Codon']
+        .to_dict()
+    )
+
+    # Step 2: Translate the protein sequence using the most frequent codons
+    optimized_dna_sequence = ''.join(most_frequent_codons[aa] for aa in protein_sequence)
+# probability algorithm
+elif algorithm == 2:
+    #step 1: Generate a Probabalistic pool to draw the codons for every amino acid.
+    # Step 1: Create codon pools based on frequency
+    codon_pools = {}
+
+    for amino_acid, group in codon_df.groupby('Amino'):
+        pool = []
+        for _, row in group.iterrows():
+            # Scale frequency to a count for a 100-size pool
+            count = int(row['Frequency'] * 100)
+            pool.extend([row['Codon']] * count)
+        codon_pools[amino_acid] = pool
+
+    # Step 2: Translate protein sequence to DNA using probabilistic codon selection
+    optimized_dna_sequence = ''.join(np.random.choice(codon_pools[aa]) for aa in protein_sequence)
+elif algorithm == 3:
+    # Step 1: Count amino acids in the protein sequence
+    amino_acid_counts = Counter(protein_sequence)
+    print(amino_acid_counts)
+    # Step 2: Create a fixed codon pool for each amino acid based on frequency, slightly overfilled to ensure enough codons
+    def create_codon_pool(amino_acid, count):
+        pool = []
+        amino_df = codon_df[codon_df['Amino'] == amino_acid]
+
+        # Use math.ceil to ensure the required number of codons
+        required_codons = math.ceil(count)
+        for _, row in amino_df.iterrows():
+            codon_count = math.ceil(row['Frequency'] * required_codons)
+            pool.extend([row['Codon']] * codon_count)
+            
+        np.random.shuffle(pool)
+        return pool
+
+    # Initialize codon pools
+    codon_pools = {amino_acid: create_codon_pool(amino_acid, count) for amino_acid, count in amino_acid_counts.items()}
+
+    # Step 3: Translate protein sequence by drawing unique codons from pools
+    optimized_dna_sequence = []
+
+    for aa in protein_sequence:
+        # Refill the pool if it’s empty by recreating it with the original count
+        if not codon_pools[aa]:  
+            codon_pools[aa] = create_codon_pool(aa, amino_acid_counts[aa])  
+
+        # Draw codon from pool
+        if codon_pools[aa]:
+            codon = codon_pools[aa].pop()
+        else:
+            # Fallback to the most frequent codon if pool is unexpectedly empty
+            codon = codon_df[codon_df['Amino'] == aa].sort_values(by='Frequency', ascending=False).iloc[0]['Codon']
+        
+        optimized_dna_sequence.append(codon)
+
+    # Join list into final DNA sequence
+    optimized_dna_sequence = ''.join(optimized_dna_sequence)
+    
+print("Optimized DNA Sequence:", optimized_dna_sequence)
     
 #
     # Cryptic splice avoidance
