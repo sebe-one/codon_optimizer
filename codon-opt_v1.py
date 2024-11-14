@@ -298,11 +298,8 @@ while algorithm is None:
     else:
         print(f"Algorithm {algorithm} selected.")
         break
-# inverted frequency for deoptimization
-if algorithm > 3:
-    # Invert frequencies in codon_df
-    codon_df['Inverted_Frequency'] = 1 - codon_df['Frequency']
-    codon_df['Inverted_Frequency'] /= codon_df.groupby('Amino')['Inverted_Frequency'].transform('sum')  # Normalize within each amino acid        
+
+
 # most frequent algorithm
 if algorithm == 1:
     # Step 1: Find the most frequent codon for each amino acid
@@ -382,11 +379,20 @@ if algorithm == 4:
 
 elif algorithm == 5:
     # Algorithm 5: Inverted Probability Frequency Distribution
+    # Invert frequencies in codon_df
+    codon_df['Inverted_Frequency'] = 1 - codon_df['Frequency']
+    
+    # Replace any NaN values with 0
+    codon_df['Inverted_Frequency'].fillna(0, inplace=True)
+    # For codons with a frequency of 1, set Inverted_Frequency to 1 (highest preference)
+    codon_df.loc[codon_df['Frequency'] == 1, 'Inverted_Frequency'] = 1
+    codon_df['Inverted_Frequency'] /= codon_df.groupby('Amino')['Inverted_Frequency'].transform('sum')  # Normalize within each amino acid        
     optimized_dna_sequence = []
     for aa in protein_sequence:
         aa_df = codon_df[codon_df['Amino'] == aa]
         codons = aa_df['Codon'].values
         probabilities = aa_df['Inverted_Frequency'].values
+        
         # Randomly choose codon based on inverted frequency distribution
         chosen_codon = np.random.choice(codons, p=probabilities)
         optimized_dna_sequence.append(chosen_codon)
@@ -397,7 +403,14 @@ elif algorithm == 6:
     # Algorithm 6: Inverted Enforced Frequency Distribution
     # Step 1: Count amino acids in the protein sequence
     amino_acid_counts = Counter(protein_sequence)
-    
+    # Invert frequencies in codon_df
+    codon_df['Inverted_Frequency'] = 1 - codon_df['Frequency']
+           
+    # Replace any NaN values with 0
+    codon_df['Inverted_Frequency'].fillna(0, inplace=True)
+    # For codons with a frequency of 1, set Inverted_Frequency to 1 (highest preference)
+    codon_df.loc[codon_df['Frequency'] == 1, 'Inverted_Frequency'] = 1      
+    codon_df['Inverted_Frequency'] /= codon_df.groupby('Amino')['Inverted_Frequency'].transform('sum')  # Normalize within each amino acid 
     # Step 2: Create a codon pool for each amino acid based on inverted frequency, using math.ceil to ensure enough codons
     def create_inverted_codon_pool(amino_acid, count):
         pool = []
