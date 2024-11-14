@@ -520,10 +520,71 @@ if avoid_duplets:
 else:
     print("Codon duplets were not avoided.")
 # slippery site avoidance
-    # ask  if user watns to avoid slippery sites   
-    # check for 4x same bases
-    # in a sliding window aproach that moves one base forward at a time
-    # keep track of the two in frame codon affected by the current sliding window and mutate the one with a better alternative 
+def avoid_slippery_sites(dna_sequence, codon_df):
+    """
+    Detects and avoids slippery sites (repeated bases) in the DNA sequence by mutating one of the affected codons.
+
+    Parameters:
+    dna_sequence (str): The DNA sequence to modify.
+    codon_df (DataFrame): Dataframe containing codon frequency data.
+
+    Returns:
+    str: Modified DNA sequence with reduced slippery sites.
+    """
+    # Convert sequence to a list of codons
+    codons = [dna_sequence[i:i+3] for i in range(0, len(dna_sequence), 3)]
+    sequence_length = len(dna_sequence)
+    
+    # Slide a window of 4 bases through the sequence, one base at a time
+    for i in range(sequence_length - 3):
+        # Get the 4-base window
+        window = dna_sequence[i:i+4]
+        
+        # Check if all four bases in the window are the same, indicating a slippery site
+        if len(set(window)) == 1:  # All characters in the window are the same
+            slippery_base = window[0]
+            print(f"Slippery site detected: {window} at position {i}")
+            
+            # Identify the affected codons (two codons containing the slippery site)
+            codon_start_1 = i // 3  # First codon in the frame
+            codon_start_2 = (i + 3) // 3  # Next codon in the frame
+            
+            # Choose one of the affected codons to mutate, prioritizing higher frequency alternatives
+            for codon_start in [codon_start_1, codon_start_2]:
+                if codon_start >= len(codons):
+                    continue  # Skip if out of range
+                
+                current_codon = codons[codon_start]
+                amino_acid = codon_df.loc[codon_df['Codon'] == current_codon, 'Amino'].values[0]
+                
+                # Get alternatives for the amino acid, sorted by frequency
+                alternatives = codon_df[(codon_df['Amino'] == amino_acid) & (codon_df['Codon'] != current_codon)]
+                alternatives = alternatives.sort_values(by='Frequency', ascending=False)
+                
+                # Find the best alternative codon that does not introduce a new slippery site
+                for alt_codon in alternatives['Codon']:
+                    if slippery_base * 4 not in (alt_codon * 3):  # Ensure it doesn't reintroduce a slippery site
+                        codons[codon_start] = alt_codon
+                        print(f"Mutated codon at position {codon_start} to {alt_codon} to avoid slippery site")
+                        break
+            # Update dna_sequence to reflect the modified codons
+            dna_sequence = ''.join(codons)
+    
+    return dna_sequence
+
+# Ask if user wants to avoid slippery sites
+avoid_slippery_sites_option = input("Do you want to avoid slippery sites? (y/n): ").strip().lower() == 'y'
+if avoid_slippery_sites_option:
+    optimized_dna_sequence = avoid_slippery_sites(optimized_dna_sequence, codon_df)
+    print("Slippery sites minimized in the sequence.")
+    print("New optimized sequence:")
+    print(optimized_dna_sequence)
+    gc_content = calculate_gc_content(optimized_dna_sequence)
+    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+else:
+    print("Slippery site avoidance not applied.")
+
+
 # one to stop avoidance or implementation
     # ask if it it should be skipped, avoided or implemented
     # if avoid: 
