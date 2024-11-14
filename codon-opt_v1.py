@@ -130,6 +130,8 @@ while True:
 
 # IF DNA 
 if is_dna:
+    
+            
     while True:
         # Find Start Codon
         start_positions = []
@@ -140,6 +142,14 @@ if is_dna:
             if codon in start_codons:
                 start_positions.append(position)
             position += 1
+        if not start_positions:
+            append_start=input('Append a Start in 5 (ATG) or 3 (CAT) prime end? 5/3').strip().upper()
+            if append_start == "5":
+                sequence = "ATG" + sequence
+                start_positions.append(0)     
+            elif append_start == "3":
+                sequence = sequence + "CAT"
+                start_positions.append(len(sequence)-1)
         print("Those potential start codons (including reverse complement) were found:")
         print(start_positions)
         ORF_start = None
@@ -191,11 +201,60 @@ if is_dna:
         position += 3  # Move to the next codon
 
     # Join the amino acids into a protein sequence string
-    protein_sequence = "".join(protein_sequence)
-    print("Translated protein sequence:")
-    print(protein_sequence)       
-     
+    protein_sequence = "".join(protein_sequence)     
+           
+#handle protein sequence
+elif not is_dna:
+    # Find Methionin
+    start_positions = []
+    start_codons = ["M"]
+    position = 0
+    while position <= len(sequence)-1:
+        aa = sequence[position]
+        if aa in start_codons:
+            start_positions.append(position)
+        position += 1
+    if not start_positions:
+        append_start=input('No potential starts found. Append a Methionin in the beginning? y/n').strip().upper()
+        if append_start == "Y":
+            sequence = "M" + sequence
+        start_positions.append(0)  
+                
+    print("Those potential start codons (Methionins) were found:")
+    print(start_positions)
+    ORF_start = None
+    
+    while ORF_start is None:
+        try:
+            ORF_start = int(input("what's your start position?").strip())
+        except ValueError:
+            print("Invalid entry")
+            continue
+        if ORF_start not in start_positions:
+            print("Invalid")
+            ORF_start = None
+        else:
+            print("Accepted")
+            
+    protein_sequence = []
+    position = ORF_start
+    aa = sequence[position]
+    while position <= len(sequence)-1 and aa != "*":
+        aa = sequence[position]
+        protein_sequence.append(aa)
+        position += 1  # Move to the next aa
 
+    # Join the amino acids into a protein sequence string
+    protein_sequence = "".join(protein_sequence)
+#check for stop codon
+if protein_sequence[-1] != "*":
+    append_stop = input("No Stop found, should a stop codon be appended? y/n").strip().upper()
+    if append_stop == "Y":
+        protein_sequence= protein_sequence+"*"
+        
+    
+print("Generated protein sequence:")
+print(protein_sequence)
 # Optimization Parameters
 
 # Prompt user to select a codon usage profile
@@ -222,41 +281,28 @@ while codon_usage is None:
         print("Invalid input. Please enter a valid number.")
 
 
-# choose motifs to avoid
-motifs_to_avoid = []
-enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
-if enter_motifs == "Y":
-    enter_motifs = True
-while enter_motifs is True:
-    motif = input("Enter motif or 0 to exit\n").strip().upper()
-    invalid = False
-    if motif == "0":
-       enter_motifs = False
-    else:
-        for letter in motif:
-            if letter not in valid_bases:
-                print("Invalid Motif")
-                invalid = True
-                continue      
-        if not invalid:
-            motifs_to_avoid.append(motif)
-print(motifs_to_avoid)
-
 #Choose algorithm
 algorithm = None
 while algorithm is None:
+    print("Available algorithms:\n")
+    print("Optimization:\n  - Most Frequent\n 2 - Probability Frequency Distribution\n 3 - Enforced Frequency Distribution\n")
+    print("Deoptimization:\n 4 - Least Frequent\n 5 - inverted Probability Frequency Distribution\n 6 - inverted Enforced Frequency Distribution\n")
     try:
-        algorithm = int(input("Please choose an optimization algorithm.\n 1 - Most Frequent\n 2 - Probability Frequency Distribution\n 3 - Enforced Frequency Distribution\n"))
+        algorithm = int(input("Please choose an optimization algorithm:"))
     except ValueError:
         print("please provide a valid option")
         continue
-    if algorithm != 1 and algorithm != 2 and algorithm !=3:
+    if algorithm != 1 and algorithm != 2 and algorithm != 3 and algorithm != 4 and algorithm != 5 and algorithm != 6:
         print("please provide a valid option")
         algorithm = None
     else:
         print(f"Algorithm {algorithm} selected.")
         break
-        
+# inverted frequency for deoptimization
+if algorithm > 3:
+    # Invert frequencies in codon_df
+    codon_df['Inverted_Frequency'] = 1 - codon_df['Frequency']
+    codon_df['Inverted_Frequency'] /= codon_df.groupby('Amino')['Inverted_Frequency'].transform('sum')  # Normalize within each amino acid        
 # most frequent algorithm
 if algorithm == 1:
     # Step 1: Find the most frequent codon for each amino acid
@@ -324,20 +370,114 @@ elif algorithm == 3:
 
     # Join list into final DNA sequence
     optimized_dna_sequence = ''.join(optimized_dna_sequence)
-    
-print("Optimized DNA Sequence:", optimized_dna_sequence)
-    
-#
-    # Cryptic splice avoidance
-        # read in DBASS 3 & 5 databases
-        # scan for splice sites
+if algorithm == 4:
+    # Algorithm 4: Least Frequent Codon
+    optimized_dna_sequence = []
+    for aa in protein_sequence:
+        # Select the codon with the lowest frequency for the amino acid
+        least_frequent_codon = codon_df[codon_df['Amino'] == aa].sort_values(by='Frequency').iloc[0]['Codon']
+        optimized_dna_sequence.append(least_frequent_codon)
+    # Join list into final DNA sequence
+    optimized_dna_sequence = ''.join(optimized_dna_sequence)
 
-    # one to stop avoidance
-        # scan for one to stop sequences
+elif algorithm == 5:
+    # Algorithm 5: Inverted Probability Frequency Distribution
+    optimized_dna_sequence = []
+    for aa in protein_sequence:
+        aa_df = codon_df[codon_df['Amino'] == aa]
+        codons = aa_df['Codon'].values
+        probabilities = aa_df['Inverted_Frequency'].values
+        # Randomly choose codon based on inverted frequency distribution
+        chosen_codon = np.random.choice(codons, p=probabilities)
+        optimized_dna_sequence.append(chosen_codon)
+    # Join list into final DNA sequence
+    optimized_dna_sequence = ''.join(optimized_dna_sequence)
+
+elif algorithm == 6:
+    # Algorithm 6: Inverted Enforced Frequency Distribution
+    # Step 1: Count amino acids in the protein sequence
+    amino_acid_counts = Counter(protein_sequence)
+    
+    # Step 2: Create a codon pool for each amino acid based on inverted frequency, using math.ceil to ensure enough codons
+    def create_inverted_codon_pool(amino_acid, count):
+        pool = []
+        amino_df = codon_df[codon_df['Amino'] == amino_acid]
+        
+        # Use math.ceil to ensure the required number of codons
+        required_codons = math.ceil(count)
+        for _, row in amino_df.iterrows():
+            codon_count = math.ceil(row['Inverted_Frequency'] * required_codons)
+            pool.extend([row['Codon']] * codon_count)
+            
+        np.random.shuffle(pool)
+        return pool
+    
+    # Initialize codon pools
+    codon_pools = {amino_acid: create_inverted_codon_pool(amino_acid, count) for amino_acid, count in amino_acid_counts.items()}
+    
+    # Step 3: Translate protein sequence by drawing unique codons from pools
+    optimized_dna_sequence = []
+    
+    for aa in protein_sequence:
+        # Refill the pool if it’s empty by recreating it with the original count
+        if not codon_pools[aa]:  
+            codon_pools[aa] = create_inverted_codon_pool(aa, amino_acid_counts[aa])  
+        
+        # Draw codon from pool
+        if codon_pools[aa]:
+            codon = codon_pools[aa].pop()
+        else:
+            # Fallback to the least frequent codon if pool is unexpectedly empty
+            codon = codon_df[codon_df['Amino'] == aa].sort_values(by='Frequency').iloc[0]['Codon']
+        
+        optimized_dna_sequence.append(codon)   
+    # Join list into final DNA sequence
+    optimized_dna_sequence = ''.join(optimized_dna_sequence) 
+    
+print("Initial optimized/deoptimized DNA Sequence:", optimized_dna_sequence)
+
+# choose motifs to avoid
+motifs_to_avoid = []
+enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
+if enter_motifs == "Y":
+    enter_motifs = True
+while enter_motifs is True:
+    motif = input("Enter motif or 0 to exit\n").strip().upper()
+    invalid = False
+    if motif == "0":
+       enter_motifs = False
+    else:
+        for letter in motif:
+            if letter not in valid_bases:
+                print("Invalid Motif")
+                invalid = True
+                continue      
+        if not invalid:
+            motifs_to_avoid.append(motif)
+print(motifs_to_avoid) 
+# avoid codon duplication 
+    # ask if it is wanted
+    # sliding window approach of 12 bases
+    # if the same codon is used twice in the window, flip a coin and mutate either the first or the second one to the next favorable one in the codon frequence table
+
+# one to stop avoidance or implementation
+    # ask if it it should be skipped, avoided or implemented
+    # if avoid: 
+        # scan for one to stop codons in frame or out of frame
         # define the (two) codons that make up the one to stop
-        # vote which codon is favorable to mutate
+        # if out of frame:
+            # vote which codon is more favorable to mutate by checking the next best frequency of those two
+        # if in frame: mutate to the next favorable option
+    # if implement: 
+        # ask for the degree of implementation (int between 1 and 100 %)
+        # ask if only in frame or total
+        # identify possible one to stop options
+        # for each option choose a random number between 0 and 101, if number > than cutoff mutate the codon to a one to stop.
 
-    # scan for motifs to avoid ( e.g. restriction sites)
-        # scan for the motif
-        # define the three codons that make up the motif
-        # vote which codon is favorable to mutate
+# Cryptic splice avoidance
+    # read in DBASS 3 & 5 databases
+    # scan for splice sites
+# scan for motifs to avoid ( e.g. restriction sites)
+    # scan for the motif
+    # define the three codons that make up the motif
+    # vote which codon is favorable to mutate
