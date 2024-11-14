@@ -13,7 +13,22 @@ def reverse_complement(sequence):
     reversed_complemented_sequence = "".join(complement[base] for base in reversed(sequence))
     
     return reversed_complemented_sequence
+def calculate_gc_content(dna_sequence):
+    """
+    Calculates the GC content of a DNA sequence.
 
+    Parameters:
+    dna_sequence (str): The DNA sequence to analyze.
+
+    Returns:
+    float: The GC content as a percentage of the sequence.
+    """
+    # Count occurrences of 'G' and 'C' in the DNA sequence
+    gc_count = dna_sequence.count('G') + dna_sequence.count('C')
+    
+    # Calculate GC content as a percentage
+    gc_content = (gc_count / len(dna_sequence)) * 100
+    return gc_content
 # Define valid characters
 valid_bases = ["G", "A", "T", "C", "*"]
 valid_AA = ["A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V", "*"]
@@ -448,7 +463,84 @@ elif algorithm == 6:
     optimized_dna_sequence = ''.join(optimized_dna_sequence) 
     
 print("Initial optimized/deoptimized DNA Sequence:", optimized_dna_sequence)
+# Calculate GC content for the optimized DNA sequence
+gc_content = calculate_gc_content(optimized_dna_sequence)
+print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
 
+
+def avoid_codon_duplets(dna_sequence, codon_df):
+    """
+    Checks for codon duplets within a sliding window and mutates one of the duplicates if found.
+
+    Parameters:
+    dna_sequence (str): The DNA sequence to modify.
+    codon_df (DataFrame): Dataframe containing codon frequency data.
+
+    Returns:
+    str: Modified DNA sequence with reduced codon duplets.
+    """
+    # Convert sequence to a list of codons
+    codons = [dna_sequence[i:i+3] for i in range(0, len(dna_sequence), 3)]
+    
+    # Sliding window approach to check for duplicates within a 6-base window (2 codons)
+    for i in range(len(codons) - 1):
+        if codons[i] == codons[i + 1]:  # Found duplicate codons in the window
+            print(f"Duplicate codon found: {codons[i]} at positions {i} and {i + 1}")
+            
+            # Decide randomly which of the duplicates to mutate (flip a coin)
+            to_mutate = i if np.random.rand() < 0.5 else i + 1
+            
+            # Identify the amino acid for this codon
+            amino_acid = codon_df.loc[codon_df['Codon'] == codons[to_mutate], 'Amino'].values[0]
+            
+            # Get alternative codons for this amino acid sorted by frequency
+            alternatives = codon_df[codon_df['Amino'] == amino_acid].sort_values(by='Frequency', ascending=False)
+            alternative_codons = alternatives['Codon'].values
+            
+            # Find the next most favorable codon (skipping the current duplicate codon)
+            for alt_codon in alternative_codons:
+                if alt_codon != codons[to_mutate]:
+                    codons[to_mutate] = alt_codon
+                    print(f"Mutated codon at position {to_mutate} to {alt_codon}")
+                    break
+    
+    # Join modified list back into a single DNA sequence
+    return ''.join(codons)
+
+# Ask if user wants to avoid codon duplets
+avoid_duplets = input("Do you want to avoid codon duplets? (y/n): ").strip().lower() == 'y'
+if avoid_duplets:
+    optimized_dna_sequence = avoid_codon_duplets(optimized_dna_sequence, codon_df)
+    print("Codon duplets minimized in the sequence.")
+    print("New optimized sequence:")
+    print(optimized_dna_sequence)
+    gc_content = calculate_gc_content(optimized_dna_sequence)
+    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+
+else:
+    print("Codon duplets were not avoided.")
+# slippery site avoidance
+    # ask  if user watns to avoid slippery sites   
+    # check for 4x same bases
+    # in a sliding window aproach that moves one base forward at a time
+    # keep track of the two in frame codon affected by the current sliding window and mutate the one with a better alternative 
+# one to stop avoidance or implementation
+    # ask if it it should be skipped, avoided or implemented
+    # if avoid: 
+        # scan for one to stop codons in frame or out of frame
+        # define the (two) codons that make up the one to stop
+        # if out of frame:
+            # vote which codon is more favorable to mutate by checking the next best frequency of those two
+        # if in frame: mutate to the next favorable option
+    # if implement: 
+        # ask for the degree of implementation (int between 1 and 100 %)
+        # ask if only in frame or total
+        # identify possible one to stop options
+        # for each option choose a random number between 0 and 101, if number > than cutoff mutate the codon to a one to stop.
+
+# Cryptic splice avoidance
+    # read in DBASS 3 & 5 databases
+    # scan for splice sites
 # choose motifs to avoid
 motifs_to_avoid = []
 enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
@@ -468,30 +560,6 @@ while enter_motifs is True:
         if not invalid:
             motifs_to_avoid.append(motif)
 print(motifs_to_avoid) 
-
-# avoid codon duplication 
-    # ask if it is wanted
-    # sliding window approach of 6 bases
-    # if the same codon is used twice in the window, flip a coin and mutate either the first or the second one to the next favorable one in the codon frequence table
-# slippery site avoidance
-    #check for 4x same bases
-# one to stop avoidance or implementation
-    # ask if it it should be skipped, avoided or implemented
-    # if avoid: 
-        # scan for one to stop codons in frame or out of frame
-        # define the (two) codons that make up the one to stop
-        # if out of frame:
-            # vote which codon is more favorable to mutate by checking the next best frequency of those two
-        # if in frame: mutate to the next favorable option
-    # if implement: 
-        # ask for the degree of implementation (int between 1 and 100 %)
-        # ask if only in frame or total
-        # identify possible one to stop options
-        # for each option choose a random number between 0 and 101, if number > than cutoff mutate the codon to a one to stop.
-
-# Cryptic splice avoidance
-    # read in DBASS 3 & 5 databases
-    # scan for splice sites
 # scan for motifs to avoid ( e.g. restriction sites)
     # scan for the motif
     # define the three codons that make up the motif
