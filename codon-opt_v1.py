@@ -285,7 +285,7 @@ while codon_usage is None:
 algorithm = None
 while algorithm is None:
     print("Available algorithms:\n")
-    print("Optimization:\n  - Most Frequent\n 2 - Probability Frequency Distribution\n 3 - Enforced Frequency Distribution\n")
+    print("Optimization:\n 1 - Most Frequent\n 2 - Probability Frequency Distribution\n 3 - Enforced Frequency Distribution\n")
     print("Deoptimization:\n 4 - Least Frequent\n 5 - inverted Probability Frequency Distribution\n 6 - inverted Enforced Frequency Distribution\n")
     try:
         algorithm = int(input("Please choose an optimization algorithm:"))
@@ -455,11 +455,13 @@ while enter_motifs is True:
         if not invalid:
             motifs_to_avoid.append(motif)
 print(motifs_to_avoid) 
+
 # avoid codon duplication 
     # ask if it is wanted
-    # sliding window approach of 12 bases
+    # sliding window approach of 6 bases
     # if the same codon is used twice in the window, flip a coin and mutate either the first or the second one to the next favorable one in the codon frequence table
-
+# slippery site avoidance
+    #check for 4x same bases
 # one to stop avoidance or implementation
     # ask if it it should be skipped, avoided or implemented
     # if avoid: 
