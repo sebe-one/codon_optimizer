@@ -6,6 +6,8 @@ import os
 from collections import Counter
 import math
 import random
+import re
+
 def reverse_complement(sequence):
     # Define complement mapping
     complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
@@ -671,9 +673,115 @@ print(optimized_dna_sequence)
 gc_content = calculate_gc_content(optimized_dna_sequence)
 print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
 print("One-to-stop handling applied.")
+
+
 # Cryptic splice avoidance
-    # read in DBASS 3 & 5 databases
+    # ask user if cryptic splice sites should be avoided
+    # read in DBASS 3 & 5 databases .csv files
     # scan for splice sites
+def preprocess_dbass(file_path):
+    """
+    Preprocess the DBASS database to extract 6-base motifs by sliding across each splice site motif.
+    :param file_path: str, path to the DBASS file.
+    :return: list of 6-base valid splice site motifs.
+    """
+    try:
+        dbass = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Database file {file_path} not found.")
+        return []
+
+    # Preprocess the NucleotideSequence column
+    def clean_sequence(seq):
+        # Convert to uppercase and remove invalid characters (only GATC are valid)
+        return ''.join([char for char in seq.upper() if char in "GATC"])
+
+    # Clean sequences and extract the cleaned sequence
+    dbass['CleanedSequence'] = dbass['NucleotideSequence'].apply(lambda seq: clean_sequence(seq))
+
+    # Create a list to store 6-base substrings
+    six_base_motifs = []
+
+    for seq in dbass['CleanedSequence'].dropna():
+        # Slide a 6-base window across the splice site motif
+        for i in range(len(seq) - 5):  # Slide window, ensuring we only get 6-base substrings
+            six_base_motifs.append(seq[i:i+6])
+
+    # Remove duplicates and return the list of unique 6-base motifs
+    return list(set(six_base_motifs))
+
+def cryptic_splice_site_avoidance(dna_sequence, codon_df, avoid_splice_sites=True):
+    """
+    Avoid cryptic splice sites in a DNA sequence.
+    :param dna_sequence: str, the optimized DNA sequence.
+    :param codon_df: pandas DataFrame containing codon frequency data.
+    :param avoid_splice_sites: bool, whether to avoid splice sites.
+    :return: str, the modified DNA sequence.
+    """
+    if not avoid_splice_sites:
+        return dna_sequence
+
+    # Load and preprocess DBASS databases
+    dbass3_motifs = preprocess_dbass(os.path.join(script_dir,"DBASS3.csv"))
+    dbass5_motifs = preprocess_dbass(os.path.join(script_dir,"DBASS5.csv"))
+
+    # Combine known splice site motifs
+    splice_sites = dbass3_motifs + dbass5_motifs
+    splice_sites = [site.upper() for site in splice_sites]  # Ensure uppercase for consistency
+
+    print(f"Loaded {len(splice_sites)} cryptic splice site motifs.")
+
+    # Sliding window approach
+    codon_length = 3
+    sequence_length = len(dna_sequence)
+    for i in range(sequence_length - 6):  # Check 6-base windows
+        print(f"Current Window checked: {i}")
+        window = dna_sequence[i:i + 6]
+        if window in splice_sites:
+            print(f"Cryptic splice site identified: {window} at position {i}")
+
+            # Determine the contributing codons
+            codon1_start = (i // codon_length) * codon_length
+            codon2_start = ((i + 3) // codon_length) * codon_length
+
+            codon1 = dna_sequence[codon1_start:codon1_start + codon_length]
+            codon2 = dna_sequence[codon2_start:codon2_start + codon_length]
+
+            print(f"Affected codons: {codon1} (at {codon1_start}), {codon2} (at {codon2_start})")
+
+            # Mutate one of the codons to avoid the splice site
+            aa1 = codon_df[codon_df['Codon'] == codon1]['Amino'].values[0]
+            aa2 = codon_df[codon_df['Codon'] == codon2]['Amino'].values[0]
+
+            # Get alternative codons
+            alt_codons1 = codon_df[(codon_df['Amino'] == aa1) & (codon_df['Codon'] != codon1)]
+            alt_codons2 = codon_df[(codon_df['Amino'] == aa2) & (codon_df['Codon'] != codon2)]
+
+            if not alt_codons1.empty:
+                new_codon1 = alt_codons1.sort_values(by="Frequency", ascending=False)['Codon'].iloc[0]
+                dna_sequence = dna_sequence[:codon1_start] + new_codon1 + dna_sequence[codon1_start + codon_length:]
+                print(f"Mutated {codon1} to {new_codon1} at position {codon1_start}")
+
+            elif not alt_codons2.empty:
+                new_codon2 = alt_codons2.sort_values(by="Frequency", ascending=False)['Codon'].iloc[0]
+                dna_sequence = dna_sequence[:codon2_start] + new_codon2 + dna_sequence[codon2_start + codon_length:]
+                print(f"Mutated {codon2} to {new_codon2} at position {codon2_start}")
+
+            else:
+                print(f"Could not mutate cryptic splice site {window} due to lack of alternative codons.")
+
+    return dna_sequence
+
+# optimize for cryptic splice sites
+cryptic_avoidance = input("Should cryptic splice sites be avoided? y/n").strip().upper()
+if cryptic_avoidance == "Y":
+    optimized_dna_sequence = cryptic_splice_site_avoidance(optimized_dna_sequence, codon_df)
+    print(f"Optimized DNA sequence: {optimized_dna_sequence}")
+    gc_content = calculate_gc_content(optimized_dna_sequence)
+    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+else:
+    print("Skipped cryptic splice site functionality...")
+
 # choose motifs to avoid
 motifs_to_avoid = []
 enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
