@@ -5,6 +5,7 @@ import numpy as np
 import os
 from collections import Counter
 import math
+import random
 def reverse_complement(sequence):
     # Define complement mapping
     complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
@@ -29,9 +30,13 @@ def calculate_gc_content(dna_sequence):
     # Calculate GC content as a percentage
     gc_content = (gc_count / len(dna_sequence)) * 100
     return gc_content
+
+
 # Define valid characters
 valid_bases = ["G", "A", "T", "C", "*"]
 valid_AA = ["A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V", "*"]
+# Define stop codons
+stop_codons = ["TAA", "TAG", "TGA"]
 # Define a codon-to-amino-acid dictionary for translation
 codon_table = {
     "TTT": "F", "TTC": "F", "TTA": "L", "TTG": "L",
@@ -60,6 +65,8 @@ codon_usage_profiles = {
     4: "Mouse",
     5: "Insect"
 }
+
+
 # Define file paths for each codon usage profile (replace with your actual file paths)
 # Get the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -584,21 +591,86 @@ if avoid_slippery_sites_option:
 else:
     print("Slippery site avoidance not applied.")
 
+# Generate a mapping of amino acids to their potential one-to-stop codons
+amino_to_one_to_stop = {}
+for aa in codon_df['Amino'].unique():
+    aa_codons = codon_df[codon_df['Amino'] == aa]['Codon'].tolist()
+    one_to_stop_codons = []
+    for codon in aa_codons:
+        for pos in range(3):
+            for base in "ATGC":
+                if base != codon[pos]:  # Ensure mutation
+                    mutated_codon = codon[:pos] + base + codon[pos+1:]
+                    if mutated_codon in stop_codons:
+                        one_to_stop_codons.append(codon)
+                        break
+    amino_to_one_to_stop[aa] = list(set(one_to_stop_codons))  # Remove duplicates
 
-# one to stop avoidance or implementation
-    # ask if it it should be skipped, avoided or implemented
-    # if avoid: 
-        # scan for one to stop codons in frame or out of frame
-        # define the (two) codons that make up the one to stop
-        # if out of frame:
-            # vote which codon is more favorable to mutate by checking the next best frequency of those two
-        # if in frame: mutate to the next favorable option
-    # if implement: 
-        # ask for the degree of implementation (int between 1 and 100 %)
-        # ask if only in frame or total
-        # identify possible one to stop options
-        # for each option choose a random number between 0 and 101, if number > than cutoff mutate the codon to a one to stop.
+#print("Amino Acid to One-to-Stop Codon Mapping:")
+#for aa, codons in amino_to_one_to_stop.items():
+#    print(f"{aa}: {codons}")
 
+def one_to_stop_functionality(dna_sequence,mode="s", implementation_degree=50):
+    """
+    Modify codons based on one-to-stop functionality.
+    
+    :param mode: 'avoid' or 'implement'
+    :param dna_sequence: DNA sequence as a string
+    :param implementation_degree: Percentage of codons to mutate when implementing one-to-stop
+    :return: Modified DNA sequence as a string
+    """
+    # Split DNA sequence into codons (triplets)
+    codons = [dna_sequence[i:i+3] for i in range(0, len(dna_sequence), 3)]
+    modified_codons = codons.copy()
+
+    if mode == "a":
+        for index, codon in enumerate(modified_codons):
+            amino_acid = codon_df[codon_df['Codon'] == codon].iloc[0]['Amino']
+            if codon in amino_to_one_to_stop.get(amino_acid, []):  # Codon is one-to-stop
+                # Find alternative codons that are not one-to-stop
+                aa_codons = codon_df[codon_df['Amino'] == amino_acid].sort_values(by='Frequency', ascending=False)['Codon'].tolist()
+                alternative_codons = [alt for alt in aa_codons if alt not in amino_to_one_to_stop.get(amino_acid, [])]
+                
+                # Replace with the most frequent alternative, or keep the original if no alternative exists
+                if alternative_codons:
+                    print(f"Avoiding one-to-stop codon {codon} at position {index}. Replacing with {alternative_codons[0]}")
+                    modified_codons[index] = alternative_codons[0]
+                else:
+                    print(f"No alternative codon available for {codon} at position {index}. Keeping original.")
+    elif mode == "i":
+        for index, codon in enumerate(modified_codons):
+            amino_acid = codon_df[codon_df['Codon'] == codon].iloc[0]['Amino']
+            
+            # Skip if codon is already a one-to-stop
+            if codon in amino_to_one_to_stop.get(amino_acid, []):
+                continue
+
+            # Check if a one-to-stop codon exists for this amino acid
+            possible_one_to_stops = amino_to_one_to_stop.get(amino_acid, [])
+            if possible_one_to_stops and random.randint(0, 100) < implementation_degree:
+                # Use the most frequent one-to-stop codon
+                chosen_one_to_stop = max(possible_one_to_stops, key=lambda c: codon_df[codon_df['Codon'] == c]['Frequency'].iloc[0])
+                print(f"Implementing one-to-stop for {codon} at position {index}. Replacing with {chosen_one_to_stop}")
+                modified_codons[index] = chosen_one_to_stop
+            else:
+                print(f"No one-to-stop codon available for {codon} at position {index}. Keeping original.")
+    else:
+        print("one-to-stop functionality skipped...")
+    # Rejoin modified codons into a DNA sequence string
+    return ''.join(modified_codons)
+
+# Ask user for input
+one_to_stop_mode = input("Choose one-to-stop handling mode (s - skip/ a - avoid/ i - implement): ").strip().lower()
+if one_to_stop_mode == "i":
+    degree = int(input("Enter degree of implementation (1-100%): ").strip())
+else:
+    degree = 0  # No degree needed for "skip" or "avoid"
+# Apply one-to-stop handling
+optimized_dna_sequence = one_to_stop_functionality(dna_sequence=optimized_dna_sequence, mode=one_to_stop_mode, implementation_degree=degree)
+print(optimized_dna_sequence)
+gc_content = calculate_gc_content(optimized_dna_sequence)
+print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+print("One-to-stop handling applied.")
 # Cryptic splice avoidance
     # read in DBASS 3 & 5 databases
     # scan for splice sites
