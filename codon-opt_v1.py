@@ -150,8 +150,7 @@ while True:
     break
 
 
-# Translation to protein sequence
-
+## Translation to protein sequence
 # IF DNA 
 if is_dna:
     
@@ -225,8 +224,7 @@ if is_dna:
         position += 3  # Move to the next codon
 
     # Join the amino acids into a protein sequence string
-    protein_sequence = "".join(protein_sequence)     
-           
+    protein_sequence = "".join(protein_sequence)             
 #handle protein sequence
 elif not is_dna:
     # Find Methionin
@@ -275,8 +273,7 @@ if protein_sequence[-1] != "*":
     append_stop = input("No Stop found, should a stop codon be appended? y/n").strip().upper()
     if append_stop == "Y":
         protein_sequence= protein_sequence+"*"
-        
-    
+           
 print("Generated protein sequence:")
 print(protein_sequence)
 # Optimization Parameters
@@ -351,6 +348,7 @@ elif algorithm == 2:
 
     # Step 2: Translate protein sequence to DNA using probabilistic codon selection
     optimized_dna_sequence = ''.join(np.random.choice(codon_pools[aa]) for aa in protein_sequence)
+#enforced distribution
 elif algorithm == 3:
     # Step 1: Count amino acids in the protein sequence
     amino_acid_counts = Counter(protein_sequence)
@@ -391,7 +389,8 @@ elif algorithm == 3:
 
     # Join list into final DNA sequence
     optimized_dna_sequence = ''.join(optimized_dna_sequence)
-if algorithm == 4:
+#inverted most frequent
+elif algorithm == 4:
     # Algorithm 4: Least Frequent Codon
     optimized_dna_sequence = []
     for aa in protein_sequence:
@@ -400,7 +399,7 @@ if algorithm == 4:
         optimized_dna_sequence.append(least_frequent_codon)
     # Join list into final DNA sequence
     optimized_dna_sequence = ''.join(optimized_dna_sequence)
-
+# inverted probability distribution
 elif algorithm == 5:
     # Algorithm 5: Inverted Probability Frequency Distribution
     # Invert frequencies in codon_df
@@ -422,7 +421,7 @@ elif algorithm == 5:
         optimized_dna_sequence.append(chosen_codon)
     # Join list into final DNA sequence
     optimized_dna_sequence = ''.join(optimized_dna_sequence)
-
+# inverted enforced distribution
 elif algorithm == 6:
     # Algorithm 6: Inverted Enforced Frequency Distribution
     # Step 1: Count amino acids in the protein sequence
@@ -516,18 +515,7 @@ def avoid_codon_duplets(dna_sequence, codon_df):
     # Join modified list back into a single DNA sequence
     return ''.join(codons)
 
-# Ask if user wants to avoid codon duplets
-avoid_duplets = input("Do you want to avoid codon duplets? (y/n): ").strip().lower() == 'y'
-if avoid_duplets:
-    optimized_dna_sequence = avoid_codon_duplets(optimized_dna_sequence, codon_df)
-    print("Codon duplets minimized in the sequence.")
-    print("New optimized sequence:")
-    print(optimized_dna_sequence)
-    gc_content = calculate_gc_content(optimized_dna_sequence)
-    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
 
-else:
-    print("Codon duplets were not avoided.")
 # slippery site avoidance
 def avoid_slippery_sites(dna_sequence, codon_df):
     """
@@ -581,17 +569,6 @@ def avoid_slippery_sites(dna_sequence, codon_df):
     
     return dna_sequence
 
-# Ask if user wants to avoid slippery sites
-avoid_slippery_sites_option = input("Do you want to avoid slippery sites? (y/n): ").strip().lower() == 'y'
-if avoid_slippery_sites_option:
-    optimized_dna_sequence = avoid_slippery_sites(optimized_dna_sequence, codon_df)
-    print("Slippery sites minimized in the sequence.")
-    print("New optimized sequence:")
-    print(optimized_dna_sequence)
-    gc_content = calculate_gc_content(optimized_dna_sequence)
-    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
-else:
-    print("Slippery site avoidance not applied.")
 
 # Generate a mapping of amino acids to their potential one-to-stop codons
 amino_to_one_to_stop = {}
@@ -608,9 +585,6 @@ for aa in codon_df['Amino'].unique():
                         break
     amino_to_one_to_stop[aa] = list(set(one_to_stop_codons))  # Remove duplicates
 
-#print("Amino Acid to One-to-Stop Codon Mapping:")
-#for aa, codons in amino_to_one_to_stop.items():
-#    print(f"{aa}: {codons}")
 
 def one_to_stop_functionality(dna_sequence,mode="s", implementation_degree=50):
     """
@@ -661,20 +635,6 @@ def one_to_stop_functionality(dna_sequence,mode="s", implementation_degree=50):
     # Rejoin modified codons into a DNA sequence string
     return ''.join(modified_codons)
 
-# Ask user for input
-one_to_stop_mode = input("Choose one-to-stop handling mode (s - skip/ a - avoid/ i - implement): ").strip().lower()
-if one_to_stop_mode == "i":
-    degree = int(input("Enter degree of implementation (1-100%): ").strip())
-else:
-    degree = 0  # No degree needed for "skip" or "avoid"
-# Apply one-to-stop handling
-optimized_dna_sequence = one_to_stop_functionality(dna_sequence=optimized_dna_sequence, mode=one_to_stop_mode, implementation_degree=degree)
-print(optimized_dna_sequence)
-gc_content = calculate_gc_content(optimized_dna_sequence)
-print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
-print("One-to-stop handling applied.")
-
-
 # Cryptic splice avoidance
     # ask user if cryptic splice sites should be avoided
     # read in DBASS 3 & 5 databases .csv files
@@ -709,7 +669,6 @@ def preprocess_dbass(file_path):
 
     # Remove duplicates and return the list of unique 24-base motifs
     return list(set(motifs_24_base))
-
 
 def cryptic_splice_site_avoidance(dna_sequence, codon_df, avoid_splice_sites=True):
     """
@@ -770,16 +729,6 @@ def cryptic_splice_site_avoidance(dna_sequence, codon_df, avoid_splice_sites=Tru
 
     return dna_sequence
 
-# Ask user whether to avoid cryptic splice sites
-cryptic_avoidance = input("Should cryptic splice sites be avoided? (y/n): ").strip().upper()
-if cryptic_avoidance == "Y":
-    optimized_dna_sequence = cryptic_splice_site_avoidance(optimized_dna_sequence, codon_df)
-    print(f"Optimized DNA sequence: {optimized_dna_sequence}")
-    gc_content = calculate_gc_content(optimized_dna_sequence)
-    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
-else:
-    print("Skipped cryptic splice site functionality...")
-
 # avoid consensus splice.
 def avoid_consensus_splice_sites(dna_sequence, codon_df):
     consensus_splice = "AGGTAAGT"
@@ -818,36 +767,179 @@ def avoid_consensus_splice_sites(dna_sequence, codon_df):
                 print(f"Could not mutate splice site {window} due to lack of alternative codons.")
     return dna_sequence
 
-# Ask user whether to avoid cryptic splice sites
-consensus_splice_avoidance = input("Should consensus splice sites be avoided? (y/n): ").strip().upper()
-if consensus_splice_avoidance == "Y":
-    optimized_dna_sequence = avoid_consensus_splice_sites(optimized_dna_sequence, codon_df)
-    print(f"Optimized DNA sequence: {optimized_dna_sequence}")
-    gc_content = calculate_gc_content(optimized_dna_sequence)
-    print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
-else:
-    print("Skipped consensus splice site functionality...")
+#avoid defined motifs    
+def avoid_motifs(dna_sequence, codon_df, motifs_to_avoid):
+    """
+    Avoid specified motifs in a DNA sequence by mutating contributing codons.
+    :param dna_sequence: str, the DNA sequence.
+    :param codon_df: pandas DataFrame containing codon frequency data.
+    :param motifs_to_avoid: list of motifs to avoid.
+    :return: str, the modified DNA sequence.
+    """
+    codon_length = 3  # Each codon is 3 bases long
     
-# choose motifs to avoid
-motifs_to_avoid = []
-enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
-if enter_motifs == "Y":
-    enter_motifs = True
-while enter_motifs is True:
-    motif = input("Enter motif or 0 to exit\n").strip().upper()
-    invalid = False
-    if motif == "0":
-       enter_motifs = False
-    else:
-        for letter in motif:
-            if letter not in valid_bases:
-                print("Invalid Motif")
-                invalid = True
-                continue      
-        if not invalid:
-            motifs_to_avoid.append(motif)
-print(motifs_to_avoid) 
-# scan for motifs to avoid ( e.g. restriction sites)
-    # scan for the motif
-    # define the three codons that make up the motif
-    # vote which codon is favorable to mutate
+    for motif in motifs_to_avoid:
+        window_size = len(motif)
+        i = 0  # Start position for sliding window
+
+        while i <= len(dna_sequence) - window_size:
+            # Check current window
+            window = dna_sequence[i:i + window_size]
+            if window == motif:
+                print(f"Motif identified: {window} at position {i}")
+
+                # Determine the contributing codons
+                codon_start_positions = sorted(set([
+                    (i + offset) // codon_length * codon_length
+                    for offset in range(window_size)
+                ]))  # Unique and sorted positions
+                
+                affected_codons = [
+                    dna_sequence[pos:pos + codon_length]
+                    for pos in codon_start_positions
+                    if pos + codon_length <= len(dna_sequence)
+                ]
+
+                print(f"Affected codons: {affected_codons}")
+
+                # Attempt to mutate one of the codons to avoid the motif
+                mutated = False
+                for codon_index, codon_start in enumerate(codon_start_positions):
+                    if mutated:
+                        break
+
+                    codon = dna_sequence[codon_start:codon_start + codon_length]
+                    if codon in codon_df['Codon'].values:
+                        aa = codon_df[codon_df['Codon'] == codon]['Amino'].values[0]
+                        alt_codons = codon_df[
+                            (codon_df['Amino'] == aa) & (codon_df['Codon'] != codon)
+                        ]
+
+                        if not alt_codons.empty:
+                            # Choose the most frequent alternative codon
+                            new_codon = alt_codons.sort_values(by="Frequency", ascending=False)['Codon'].iloc[0]
+                            # Update the sequence at the specific codon start
+                            dna_sequence = (
+                                dna_sequence[:codon_start]
+                                + new_codon
+                                + dna_sequence[codon_start + codon_length:]
+                            )
+                            print(f"Mutated codon {codon} to {new_codon} at position {codon_start} to avoid motif.")
+                            mutated = True
+
+                if not mutated:
+                    print(f"Could not mutate motif {window} due to lack of alternative codons.")
+
+                # Restart the scan to check for overlapping motifs
+                continue
+
+            # Move to the next position
+            i += 1
+
+    return dna_sequence
+
+# Ask user for input
+further_optimization=True
+while further_optimization:
+    print("Further optimization options:\n 0 - None\n 1 - SlipperySite Avoidance\n 2 - OneToStop\n 3 - Codon Duplets \n 4 - Splice Sites \n 5 - Custom Sequence Elements")
+    further_optimization_choice = input("Choose Further optimization: ").strip()
+    try:
+        further_optimization_choice = int(further_optimization_choice)
+    except ValueError:
+        print("Please provide a valid option!")
+    if further_optimization_choice == 0:
+        further_optimization = False
+        print("Final optimized sequence:")
+        print(optimized_dna_sequence)
+        gc_content = calculate_gc_content(optimized_dna_sequence)
+        print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+    elif further_optimization_choice == 1:
+        # Ask if user wants to avoid slippery sites
+        print("Slippery sites are defined as at least 4 repeats of the same base.")
+        avoid_slippery_sites_option = input("Do you want to avoid slippery sites? (y/n): ").strip().lower() == 'y'
+        if avoid_slippery_sites_option:
+            optimized_dna_sequence = avoid_slippery_sites(optimized_dna_sequence, codon_df)
+            print("Slippery sites minimized in the sequence.")
+            print("New optimized sequence:")
+            print(optimized_dna_sequence)
+            gc_content = calculate_gc_content(optimized_dna_sequence)
+            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+        else:
+            print("Slippery site avoidance not applied.")
+    elif further_optimization_choice == 2:
+        #one-to-stop implementation
+        one_to_stop_mode = input("Choose one-to-stop handling mode (s - skip/ a - avoid/ i - implement): ").strip().lower()
+        if one_to_stop_mode == "i":
+            degree = int(input("Enter degree of implementation (1-100%): ").strip())
+        else:
+            degree = 0  # No degree needed for "skip" or "avoid"
+        # Apply one-to-stop handling
+        if one_to_stop_mode == "a" or one_to_stop_mode == "i":
+            optimized_dna_sequence = one_to_stop_functionality(dna_sequence=optimized_dna_sequence, mode=one_to_stop_mode, implementation_degree=degree)
+            print(optimized_dna_sequence)
+            gc_content = calculate_gc_content(optimized_dna_sequence)
+            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+            print("One-to-stop handling applied.")
+        else:
+            print("One-to-Stop Handling skipped")
+    elif further_optimization_choice == 3:
+         # Ask if user wants to avoid codon duplets
+        avoid_duplets = input("Do you want to avoid codon duplets? (y/n): ").strip().lower() == 'y'
+        if avoid_duplets:
+            optimized_dna_sequence = avoid_codon_duplets(optimized_dna_sequence, codon_df)
+            print("Codon duplets minimized in the sequence.")
+            print("New optimized sequence:")
+            print(optimized_dna_sequence)
+            gc_content = calculate_gc_content(optimized_dna_sequence)
+            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+        else:
+            print("Codon duplets were not avoided.")
+    elif further_optimization_choice == 4:
+        # Ask user whether to avoid cryptic splice sites 
+        cryptic_avoidance = input("Should cryptic splice sites be avoided? (y/n): ").strip().upper()
+        if cryptic_avoidance == "Y":
+            optimized_dna_sequence = cryptic_splice_site_avoidance(optimized_dna_sequence, codon_df)
+            print(f"Optimized DNA sequence: {optimized_dna_sequence}")
+            gc_content = calculate_gc_content(optimized_dna_sequence)
+            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+        else:
+            print("Skipped cryptic splice site functionality...")
+
+        # Ask user whether to avoid consensus splice sites
+        consensus_splice_avoidance = input("Should consensus splice sites be avoided? (y/n): ").strip().upper()
+        if consensus_splice_avoidance == "Y":
+            optimized_dna_sequence = avoid_consensus_splice_sites(optimized_dna_sequence, codon_df)
+            print(f"Optimized DNA sequence: {optimized_dna_sequence}")
+            gc_content = calculate_gc_content(optimized_dna_sequence)
+            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+        else:
+            print("Skipped consensus splice site functionality...")
+    elif further_optimization_choice == 5:
+        # Enter motifs to avoid
+        motifs_to_avoid = []
+        enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
+        if enter_motifs == "Y":
+            enter_motifs = True
+            while enter_motifs is True:
+                motif = input("Enter motif or 0 to exit\n").strip().upper()
+                invalid = False
+                if motif == "0":
+                    enter_motifs = False
+                else:
+                    for letter in motif:
+                        if letter not in valid_bases:
+                            print("Invalid Motif")
+                            invalid = True
+                            continue      
+                    if not invalid:
+                        motifs_to_avoid.append(motif)
+            print(f"Those motifs were be avoided:{motifs_to_avoid}")
+            optimized_dna_sequence = avoid_motifs(optimized_dna_sequence, codon_df,motifs_to_avoid)
+            print(f"Optimized DNA sequence: {optimized_dna_sequence}")
+            gc_content = calculate_gc_content(optimized_dna_sequence)
+            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+        else:
+            print("Skipped motiv avoidance functionality...") 
+
+exit   
+
