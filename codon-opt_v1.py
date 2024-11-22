@@ -491,6 +491,7 @@ if algorithm > 3:
     use_inverted = input("Do you want to apply the deopt codon usage to the following strategies ? y/n").strip().upper()
     if use_inverted == "Y":
         codon_df['Frequency'] = codon_df['Inverted_Frequency']
+        print("Deoptimized codon usage applied")
     #print("Modified/Inverted Codon usage table:")
     #print(codon_df)
 
@@ -653,7 +654,7 @@ def one_to_stop_functionality(dna_sequence,mode="s", implementation_degree=50):
     # Rejoin modified codons into a DNA sequence string
     return ''.join(modified_codons)
 
-# Cryptic splice avoidance
+# Cryptic splice avoidance 
     # ask user if cryptic splice sites should be avoided
     # read in DBASS 3 & 5 databases .csv files
     # scan for splice sites
@@ -687,7 +688,7 @@ def preprocess_dbass(file_path):
 
     # Remove duplicates and return the list of unique 24-base motifs
     return list(set(motifs_24_base))
-
+#unused function only use avoid motifs
 def cryptic_splice_site_avoidance(dna_sequence, codon_df, avoid_splice_sites=True):
     """
     Avoid cryptic splice sites in a DNA sequence.
@@ -747,7 +748,7 @@ def cryptic_splice_site_avoidance(dna_sequence, codon_df, avoid_splice_sites=Tru
 
     return dna_sequence
 
-# avoid consensus splice.
+# avoid consensus splice. unused, avoid_motifs is better
 def avoid_consensus_splice_sites(dna_sequence, codon_df):
     consensus_splice = "AGGTAAGT"
      # Sliding window approach
@@ -916,7 +917,16 @@ while further_optimization:
         # Ask user whether to avoid cryptic splice sites 
         cryptic_avoidance = input("Should cryptic splice sites be avoided? (y/n): ").strip().upper()
         if cryptic_avoidance == "Y":
-            optimized_dna_sequence = cryptic_splice_site_avoidance(optimized_dna_sequence, codon_df)
+            # Load and preprocess DBASS databases
+            dbass3_motifs = preprocess_dbass(os.path.join(script_dir, "DBASS3.csv"))
+            dbass5_motifs = preprocess_dbass(os.path.join(script_dir, "DBASS5.csv"))
+
+            # Combine known splice site motifs
+            splice_sites = dbass3_motifs + dbass5_motifs
+            splice_sites = [site.upper() for site in splice_sites]  # Ensure uppercase for consistency
+            
+            print(f"Loaded {len(splice_sites)} cryptic splice site motifs.")
+            optimized_dna_sequence = avoid_motifs(optimized_dna_sequence, codon_df, motifs_to_avoid=splice_sites)
             print(f"Optimized DNA sequence: {optimized_dna_sequence}")
             gc_content = calculate_gc_content(optimized_dna_sequence)
             print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
@@ -926,7 +936,8 @@ while further_optimization:
         # Ask user whether to avoid consensus splice sites
         consensus_splice_avoidance = input("Should consensus splice sites be avoided? (y/n): ").strip().upper()
         if consensus_splice_avoidance == "Y":
-            optimized_dna_sequence = avoid_consensus_splice_sites(optimized_dna_sequence, codon_df)
+            consensus_splice = ["AGGTAAGT"]
+            optimized_dna_sequence = avoid_motifs(optimized_dna_sequence, codon_df,motifs_to_avoid=consensus_splice)
             print(f"Optimized DNA sequence: {optimized_dna_sequence}")
             gc_content = calculate_gc_content(optimized_dna_sequence)
             print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
@@ -956,5 +967,7 @@ while further_optimization:
         print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
          
 
-exit   
+finished = input("press any key to exit...")
+if finished:
+    exit  
 
