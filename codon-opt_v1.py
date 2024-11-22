@@ -915,7 +915,7 @@ while further_optimization:
             print("Codon duplets were not avoided.")
     elif further_optimization_choice == 4:
         # Ask user whether to avoid cryptic splice sites 
-        cryptic_avoidance = input("Should cryptic splice sites be avoided? (y/n): ").strip().upper()
+        cryptic_avoidance = input("Should cryptic splice sites be avoided (CPU intensive)? (y/n): ").strip().upper()
         if cryptic_avoidance == "Y":
             # Load and preprocess DBASS databases
             dbass3_motifs = preprocess_dbass(os.path.join(script_dir, "DBASS3.csv"))
