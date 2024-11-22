@@ -14,7 +14,7 @@ There are 5 built-in Codon Usage profiles available:
 * Insect
   
 ## Base Optimization algorithms
-There are six base optimization algoritms are available:
+There are six base algoritms are available:
 #### Optimization:
 * Most Frequent: using only the most prevalent codon for that aminoacid.
 * Probability Distribution: Each codon is sampled from the according probability distribution of all available codons for that aa.
