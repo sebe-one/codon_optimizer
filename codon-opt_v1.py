@@ -308,6 +308,7 @@ while algorithm is None:
     print("Available algorithms:\n")
     print("Optimization:\n 1 - Most Frequent\n 2 - Probability Frequency Distribution\n 3 - Enforced Frequency Distribution\n")
     print("Deoptimization:\n 4 - Least Frequent\n 5 - inverted Probability Frequency Distribution\n 6 - inverted Enforced Frequency Distribution\n")
+    
     try:
         algorithm = int(input("Please choose an optimization algorithm:"))
     except ValueError:
@@ -391,6 +392,13 @@ elif algorithm == 3:
     optimized_dna_sequence = ''.join(optimized_dna_sequence)
 #inverted most frequent
 elif algorithm == 4:
+    # Invert frequencies in codon_df
+    codon_df['Inverted_Frequency'] = 1 - codon_df['Frequency']
+    # Replace any NaN values with 0
+    codon_df['Inverted_Frequency'].fillna(0, inplace=True)
+    # For codons with a frequency of 1, set Inverted_Frequency to 1 (highest preference)
+    codon_df.loc[codon_df['Frequency'] == 1, 'Inverted_Frequency'] = 1
+    codon_df['Inverted_Frequency'] /= codon_df.groupby('Amino')['Inverted_Frequency'].transform('sum')  # Normalize within each amino acid        
     # Algorithm 4: Least Frequent Codon
     optimized_dna_sequence = []
     for aa in protein_sequence:
@@ -470,11 +478,21 @@ elif algorithm == 6:
     # Join list into final DNA sequence
     optimized_dna_sequence = ''.join(optimized_dna_sequence) 
     
+
+
+
 print("Initial optimized/deoptimized DNA Sequence:", optimized_dna_sequence)
 # Calculate GC content for the optimized DNA sequence
 gc_content = calculate_gc_content(optimized_dna_sequence)
 print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
 
+
+if algorithm > 3:
+    use_inverted = input("Do you want to apply the deopt codon usage to the following strategies ? y/n").strip().upper()
+    if use_inverted == "Y":
+        codon_df['Frequency'] = codon_df['Inverted_Frequency']
+    #print("Modified/Inverted Codon usage table:")
+    #print(codon_df)
 
 def avoid_codon_duplets(dna_sequence, codon_df):
     """
@@ -917,29 +935,26 @@ while further_optimization:
     elif further_optimization_choice == 5:
         # Enter motifs to avoid
         motifs_to_avoid = []
-        enter_motifs = input("Do you want to enter motifs to avoid e.g. restriction sites? y/n\n").strip().upper()
-        if enter_motifs == "Y":
-            enter_motifs = True
-            while enter_motifs is True:
-                motif = input("Enter motif or 0 to exit\n").strip().upper()
-                invalid = False
-                if motif == "0":
-                    enter_motifs = False
-                else:
-                    for letter in motif:
-                        if letter not in valid_bases:
-                            print("Invalid Motif")
-                            invalid = True
-                            continue      
-                    if not invalid:
-                        motifs_to_avoid.append(motif)
-            print(f"Those motifs were be avoided:{motifs_to_avoid}")
-            optimized_dna_sequence = avoid_motifs(optimized_dna_sequence, codon_df,motifs_to_avoid)
-            print(f"Optimized DNA sequence: {optimized_dna_sequence}")
-            gc_content = calculate_gc_content(optimized_dna_sequence)
-            print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
-        else:
-            print("Skipped motiv avoidance functionality...") 
+        enter_motifs = True
+        while enter_motifs is True:
+            motif = input("Enter your motifs, e.g. restriction sites, (one at a time) or 0 to exit\n").strip().upper()
+            invalid = False
+            if motif == "0":
+                enter_motifs = False
+            else:
+                for letter in motif:
+                    if letter not in valid_bases:
+                        print("Invalid Motif")
+                        invalid = True
+                        continue      
+                if not invalid:
+                    motifs_to_avoid.append(motif)
+        print(f"Those motifs were be avoided:{motifs_to_avoid}")
+        optimized_dna_sequence = avoid_motifs(optimized_dna_sequence, codon_df,motifs_to_avoid)
+        print(f"Optimized DNA sequence: {optimized_dna_sequence}")
+        gc_content = calculate_gc_content(optimized_dna_sequence)
+        print(f"GC Content of optimized DNA sequence: {gc_content:.2f}%")
+         
 
 exit   
 
