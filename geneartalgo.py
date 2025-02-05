@@ -7,6 +7,7 @@ from collections import Counter
 import math
 import random
 import re
+import sys
 
 def reverse_complement(sequence):
     # Define complement mapping
@@ -82,34 +83,65 @@ codon_usage_files = {
     5: os.path.join(script_dir, "insect.xlsx")
 }
 # Function to score codon combinations
+def display_progress(current, total, bar_length=30):
+    progress = current / total
+    filled_length = int(bar_length * progress)
+    bar = '=' * filled_length + '-' * (bar_length - filled_length)
+    percent = progress * 100
+    
+    # Carriage return to overwrite the same line
+    sys.stdout.write(f'\rProgress: |{bar}| {percent:.1f}%')
+    sys.stdout.flush()
 def score_combination(codon_combination, codon_df, desired_gc=65):
-    codon_usage_score = sum(
-        codon_df[codon_df['Codon'] == codon]['Frequency'].values[0]
-        for codon in codon_combination
-    )
-
+    # Store the ratios for geometric mean calculation
+    frequency_ratios = []
+    
+    for codon in codon_combination:
+        # Get frequency of the current codon
+        codon_freq = codon_df[codon_df['Codon'] == codon]['Frequency'].values[0]
+        
+        # Identify the amino acid corresponding to the codon
+        amino_acid = codon_df[codon_df['Codon'] == codon]['Amino'].values[0]
+        
+        # Get the maximum frequency for this amino acid
+        max_freq = codon_df[codon_df['Amino'] == amino_acid]['Frequency'].max()
+        
+        # Avoid division by zero
+        ratio = codon_freq / max_freq if max_freq != 0 else 0
+        
+        frequency_ratios.append(ratio)
+    
+    # Geometric mean calculation
+    geometric_mean = np.prod(frequency_ratios) ** (1 / len(frequency_ratios))
+    
+    # Scale score to percentage
+    codon_usage_score = geometric_mean * 100
     # GC Content Score (penalty for deviation from desired GC%)
     gc_content = calculate_gc_content(''.join(codon_combination))
     gc_penalty = abs(gc_content - desired_gc)
-    gc_score = max(0, 100 - gc_penalty)  # 100 is perfect, reduced by penalty
-
+    #gc_score = max(0, 100 - gc_penalty)  # 100 is perfect, reduced by penalty
+    weighted_gc_penalty = 2*(gc_penalty**1.3) # alternative to the score, closer to original alg 
     # Repetitive Sequence Penalty
     sequence = ''.join(codon_combination)
     repeat_penalty = -100 if any(sequence[i:i+4] == sequence[i] * 4 for i in range(len(sequence)-3)) else 0
 
     # Total Score
-    total_score = codon_usage_score + gc_score + repeat_penalty
+    total_score = codon_usage_score - weighted_gc_penalty + repeat_penalty
     return total_score
 
 # Main optimization function
-def optimize_sequence_sliding_window(amino_acid_sequence, codon_df):
+def optimize_sequence_sliding_window(amino_acid_sequence, codon_df,target_gc_content):
     optimized_sequence = ''
     window_size = 4  # 4 amino acids
+    total_steps = len(amino_acid_sequence)
 
     i = 0
-    while i < len(amino_acid_sequence):
+    while i < total_steps:
+        # Display progress bar
+        display_progress(i + 1, total_steps)
+
         # Get the current window of amino acids
-        window = amino_acid_sequence[i:i+window_size]
+        window = amino_acid_sequence[i:i + window_size]
 
         # Generate all possible codon combinations for the window
         possible_codons = [
@@ -121,7 +153,7 @@ def optimize_sequence_sliding_window(amino_acid_sequence, codon_df):
 
         # Score each combination
         scored_combinations = [
-            (combination, score_combination(combination, codon_df))
+            (combination, score_combination(combination, codon_df, desired_gc=target_gc_content))
             for combination in all_combinations
         ]
 
@@ -134,6 +166,7 @@ def optimize_sequence_sliding_window(amino_acid_sequence, codon_df):
         # Move the window by one amino acid (fixing the first codon)
         i += 1
 
+    print()  # Move to the next line after the progress bar is complete
     return optimized_sequence
 
 #Start the program
@@ -354,7 +387,24 @@ while codon_usage is None:
     except ValueError:
         print("Invalid input. Please enter a valid number.")
 
-
+#Generate random seed for reproducability
+random_seed = None
+while random_seed is None:
+    print("Reproduceability for probabalistic sequences:")
+    print("Please enter an integer as a random seed to ensure reproduceability of the generated sequences")
+    print("0 - skip")
+    try:
+        random_seed = int(input("Random seed:"))
+        if  random_seed < 0:
+            random_seed = -1*random_seed
+            np.random.seed(random_seed)
+        elif random_seed > 0:
+            np.random.seed(random_seed)
+        elif random_seed == 0:
+            print("Skipped reproducability, generated sequences will be different every go!")
+            break
+    except ValueError:
+        print("Invalid input!")
 #Choose algorithm
 algorithm = None
 while algorithm is None:
@@ -531,8 +581,18 @@ elif algorithm == 6:
     # Join list into final DNA sequence
     optimized_dna_sequence = ''.join(optimized_dna_sequence) 
 elif algorithm == 7:
+    target_gc_content=None
+    while target_gc_content==None:
+        print("Please enter your desired GC content in %\n(Normally between 40-60)")
+        try:
+            target_gc_content= int(input("GC content:"))
+            if target_gc_content < 0 or target_gc_content >100:
+                target_gc_content=None
+                print("Please enter a valid GC content!")
+        except ValueError:
+            print("Please enter a valid GC content!")
     print("Calculating...")
-    optimized_dna_sequence = optimize_sequence_sliding_window(protein_sequence, codon_df)
+    optimized_dna_sequence = optimize_sequence_sliding_window(protein_sequence, codon_df,target_gc_content)
 
 
 
@@ -1025,6 +1085,37 @@ while further_optimization:
             print("Modified/Inverted Codon usage table:")
             print(codon_df)         
 
+#Export results
+def export_sequence(dna_sequence):
+    # Prompt user for directory and filename
+    directory = input("Enter the directory to save the file (leave blank for current directory): ").strip()
+    filename = input("Enter the filename (without extension): ").strip()
+
+    # Default to the current directory if none is provided
+    if not directory:
+        directory = os.getcwd()
+
+    # Ensure the filename ends with .txt
+    if not filename.endswith('.txt'):
+        filename += '.txt'
+
+    # Create the full file path
+    file_path = os.path.join(directory, filename)
+
+    try:
+        # Write the sequence to the file
+        with open(file_path, 'w') as file:
+            file.write(f">Optimized_DNA_Sequence\n")
+            # Wrap the sequence in lines of 60 characters (like FASTA format)
+            for i in range(0, len(dna_sequence), 60):
+                file.write(dna_sequence[i:i+60] + '\n')
+
+        print(f"Sequence successfully saved to {file_path}")
+
+    except Exception as e:
+        print(f"An error occurred while saving the file: {e}")
+
+export_sequence(optimized_dna_sequence)
 finished = input("press any key to exit...")
 if finished:
     exit  
