@@ -13,7 +13,7 @@ There are 5 built-in Codon Usage profiles available:
 * Yeast(Saccharomyces)
 * Insect
   
-## Base Optimization algorithms
+## Optimization algorithms
 There are seven algoritms are available:
 #### Optimization:
 * Most Frequent: using only the most prevalent codon for that aminoacid.
